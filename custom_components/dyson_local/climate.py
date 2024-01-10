@@ -17,7 +17,7 @@ from homeassistant.components.climate.const import (
 )
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import ATTR_TEMPERATURE, CONF_NAME, UnitOfTemperature
+from homeassistant.const import ATTR_TEMPERATURE, CONF_NAME, UnitOfTemperature, PRECISION_WHOLE
 from homeassistant.core import Callable, HomeAssistant
 
 from . import DysonEntity
@@ -97,7 +97,7 @@ class DysonClimateEntity(DysonEntity, ClimateEntity):
         temperature_kelvin = self._current_temperature_kelvin
         if isinstance(temperature_kelvin, str):
             return None
-        return float(f"{(temperature_kelvin - 273.15):.1f}")
+        return round(float(f"{(temperature_kelvin - 273.15):.1f}"))
 
     @environmental_property
     def current_humidity(self) -> int:
@@ -114,12 +114,21 @@ class DysonClimateEntity(DysonEntity, ClimateEntity):
         """Return the maximum temperature."""
         return 37
 
+    @property
+    def target_temperature_step(self):
+        """Return the supported step size a target temperature can be increased or decreased by."""
+        return PRECISION_WHOLE
+
     def set_temperature(self, **kwargs):
         """Set new target temperature."""
         target_temp = kwargs.get(ATTR_TEMPERATURE)
         if target_temp is None:
             _LOGGER.error("Missing target temperature %s", kwargs)
             return
+        # Limit the target temperature to whole numbers
+        if target_temp != round(target_temp):
+            _LOGGER.warning('Temperature requested is not a whole number, adjusting')
+            target_temp = round(target_temp)
         _LOGGER.debug("Set %s temperature %s", self.name, target_temp)
         # Limit the target temperature into acceptable range.
         target_temp = min(self.max_temp, target_temp)
